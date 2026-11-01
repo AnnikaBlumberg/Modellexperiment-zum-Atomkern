@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atomkern-Experiment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<style>
+/* Layout: Laborplatz – oben der Arbeitsauftrag, links die runde Experimentierfläche, rechts die Materialkästen.
+   Bewusst nur ein helles Erscheinungsbild: hellorangener Hintergrund, hellrote Fläche. */
+:root {
+  --bg: #FFF5EA;
+  --surface: #fffcf8;
+  --ink: #2b1a0e;
+  --muted: #7a5a42;
+  --line: #efbf92;
+  --accent: #b9440d;
+  --accent-soft: #ffe8d1;
+  --proton: #8F1F19;
+  --neutron: #333A48;
+  --grid: rgba(185, 68, 13, 0.09);
+  --nucleus: #F6AAA4;
+  --nucleus-line: #c9645c;
+  --shadow: rgba(90, 40, 10, 0.2);
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --p: 56px;
+  color-scheme: light;
+}
+
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 18px; line-height: 1.45;
+  overflow: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.app {
+  box-sizing: border-box; height: 100%;
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 16px;
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Kopfzeile */
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+h1 {
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(1.5rem, 2.6vw, 2.3rem);
+  margin: 0; letter-spacing: -0.01em; text-wrap: balance;
+}
+.steps { display: flex; gap: 8px; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; flex: 1; }
+.steps li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px 6px 6px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); font-size: 0.95rem;
+}
+.steps li b {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--line); color: var(--ink); font-size: 0.9rem; font-variant-numeric: tabular-nums;
+}
+.steps li.active { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
+.steps li.active b { background: var(--accent); color: #fff; }
+.steps li.done b { background: var(--accent-soft); color: var(--accent); }
+
+/* Hauptbereich */
+main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 34%); gap: 20px; min-height: 0; }
+.stage {
+  position: relative; min-width: 0; min-height: 0;
+  background-color: var(--surface);
+  border: 1px solid var(--line); border-radius: 22px; overflow: hidden;
+}
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+.readout {
+  position: absolute; left: 16px; bottom: 14px; display: flex; gap: 8px; flex-wrap: wrap;
+  font-size: 0.95rem; color: var(--muted); pointer-events: none; font-variant-numeric: tabular-nums;
+}
+.readout span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+.readout i { font-style: normal; color: var(--ink); font-weight: 700; }
+
+.side { display: flex; flex-direction: column; gap: 16px; min-height: 0; min-width: 0; overflow-y: auto; padding-bottom: 4px; }
+
+.task {
+  margin: 0; font-size: 1.2rem; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 18px;
+}
+.task small { display: block; color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+.task strong { color: var(--accent); }
+
+.tray {
+  background: var(--surface); border: 2px dashed var(--line); border-radius: 18px;
+  padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px;
+}
+.tray h2 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; }
+.slots { display: flex; flex-wrap: wrap; gap: 14px; min-height: var(--p); }
+.tray.reveal { animation: slideIn 0.6s cubic-bezier(.2, .9, .3, 1.2); }
+
+.particle {
+  width: var(--p); height: var(--p); border-radius: 50%; flex: none;
+  display: grid; place-items: center; touch-action: none; cursor: grab;
+  box-shadow: 0 3px 8px var(--shadow);
+}
+.proton {
+  position: relative;
+  background: radial-gradient(circle at 34% 30%,
+    color-mix(in srgb, var(--proton), white 45%) 0%, var(--proton) 52%,
+    color-mix(in srgb, var(--proton), black 30%) 100%);
+}
+.proton::before, .proton::after { content: ""; position: absolute; background: #fff; border-radius: 2px; }
+.proton::before { width: 44%; height: 11%; }
+.proton::after { width: 11%; height: 44%; }
+.neutron {
+  background: radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--neutron), white 40%) 0%, var(--neutron) 58%,
+    color-mix(in srgb, var(--neutron), black 28%) 100%);
+}
+.slot.used { visibility: hidden; }
+.ghost {
+  position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; cursor: grabbing;
+  box-shadow: 0 10px 22px var(--shadow);
+}
+
+.question {
+  background: var(--accent-soft); border: 2px solid var(--accent); border-radius: 18px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;
+  animation: pop 0.45s cubic-bezier(.2, .9, .3, 1.3);
+}
+.question small { color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8rem; }
+.question p { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(1.15rem, 1.7vw, 1.4rem); line-height: 1.3; }
+
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: auto; }
+.hint { margin: 0; flex-basis: 100%; color: var(--muted); font-size: 0.95rem; }
+button {
+  font: inherit; font-weight: 700; min-height: 56px; padding: 0 24px; border-radius: 14px;
+  border: 2px solid var(--accent); background: var(--accent); color: #fff;
+  cursor: pointer; touch-action: manipulation;
+}
+button.secondary { background: transparent; color: var(--accent); }
+button:disabled { background: transparent; border-color: var(--line); color: var(--muted); cursor: not-allowed; }
+button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+button:active:not(:disabled) { transform: scale(0.97); }
+#nextBtn { min-width: 160px; }
+.icon-btn { min-height: 48px; padding: 0 16px; font-size: 0.95rem; }
+
+/* Abschluss */
+.overlay {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--bg), transparent 15%);
+  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));
+}
+.panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 24px;
+  max-width: 680px; width: 100%; padding: 28px 30px; box-sizing: border-box;
+  box-shadow: 0 24px 60px var(--shadow); display: flex; flex-direction: column; gap: 18px;
+  animation: pop 0.4s cubic-bezier(.2, .9, .3, 1.2);
+}
+.panel h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 2rem; }
+.panel p { margin: 0; font-size: 1.45rem; line-height: 1.5; max-width: 34em; }
+.panel strong { color: var(--accent); }
+
+@keyframes pop { from { transform: scale(0.92); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes slideIn { from { transform: translateX(30px); opacity: 0.3; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .tray.reveal, .question, .panel { animation: none; }
+}
+
+/* Hochformat und kleine Bildschirme */
+@media (max-aspect-ratio: 1/1), (max-width: 760px) {
+  body { overflow: auto; }
+  .app { height: auto; min-height: 100%; }
+  main { grid-template-columns: minmax(0, 1fr); }
+  .stage { height: min(68vh, 92vw); min-height: 300px; }
+  .side { overflow: visible; }
+  .actions { margin-top: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>Was hält den Atomkern zusammen?</h1>
+    <ol class="steps" id="steps">
+      <li class="active"><b>1</b>Protonen</li>
+      <li><b>2</b>Weitere Kernbausteine</li>
+      <li><b>3</b>Abschluss</li>
+    </ol>
+    <button class="secondary icon-btn" id="fsBtn" type="button" hidden>Vollbild</button>
+  </header>
+
+  <p class="task"><small>Arbeitsauftrag</small><span id="taskText"></span></p>
+
+  <main>
+    <div class="stage" id="stage">
+      <canvas id="canvas" aria-label="Experimentierfläche: Ziehe Protonen auf die Fläche"></canvas>
+      <div class="readout">
+        <span>Protonen auf der Fläche: <i id="pCount">0</i> / 5</span>
+        <span id="nReadout" hidden>Weitere Bausteine auf der Fläche: <i id="nCount">0</i> / 6</span>
+      </div>
+    </div>
+
+    <aside class="side">
+      <section class="tray" id="protonTray">
+        <h2>Protonen</h2>
+        <div class="slots" id="protonSlots"></div>
+      </section>
+
+      <section class="tray" id="neutronTray" hidden>
+        <h2>Weitere Kernbausteine</h2>
+        <div class="slots" id="neutronSlots"></div>
+      </section>
+
+      <section class="question" id="q1" hidden>
+        <small>Beobachtung 1</small>
+        <p>Notiere nun deine Beobachtungen auf dem Arbeitsblatt und fertige eine Skizze an.</p>
+      </section>
+
+      <section class="question" id="q2" hidden>
+        <small>Beobachtung 2</small>
+        <p>Notiere nun deine Beobachtungen auf dem Arbeitsblatt und fertige eine Skizze an.</p>
+      </section>
+
+      <div class="actions">
+        <p class="hint" id="hint"></p>
+        <button type="button" id="nextBtn">Weiter</button>
+        <button type="button" class="secondary" id="resetBtn">Neu starten</button>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="exTitle">
+    <h2 id="exTitle">Abschluss</h2>
+    <p>Du bist fertig. Werte nun das Modellexperiment mit Hilfe des Arbeitsblattes aus.</p>
+    <div class="actions">
+      <button type="button" id="closeBtn">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const N_PROTONS = 5, N_NEUTRONS = 6;
+  const MAX_DOCK = 2;           // höchstens zwei Protonen pro Neutron
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+
+  // ---------- Geometrie ----------
+  let W = 0, H = 0, cx = 0, cy = 0, nucR = 0, R = 20, dpr = 1;
+  const parts = []; // {type:'p'|'n', x, y, vx, vy, bonds?}
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const old = { cx, cy, nucR };
+    W = r.width; H = r.height;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    cx = W / 2; cy = H / 2 - 12;
+    nucR = Math.max(80, Math.min(W, H - 24) / 2 - 18);
+    R = Math.max(15, nucR * 0.1);
+    if (old.nucR) {
+      const s = nucR / old.nucR;
+      for (const p of parts) { p.x = cx + (p.x - old.cx) * s; p.y = cy + (p.y - old.cy) * s; }
+    }
+    document.documentElement.style.setProperty('--p', (2 * R).toFixed(1) + 'px');
+  }
+  new ResizeObserver(resize).observe(stage);
+
+  // ---------- Farben aus den Tokens ----------
+  let col = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ['ink', 'muted', 'proton', 'neutron', 'nucleus', 'nucleus-line', 'shadow'])
+      col[k] = cs.getPropertyValue('--' + k).trim();
+  }
+  readColors();
+
+  // ---------- Physik ----------
+  // Protonen stoßen sich auf kurze Distanz ab (wie gleiche Magnetpole). Liegt ein Neutron
+  // zwischen zwei Protonen, wird die Abstoßung stark abgeschwächt.
+  // Neutronen ziehen nichts an und stoßen nichts ab. Berühren sie ein Teilchen, haften sie leicht
+  // daran und lassen sich durch Ziehen wieder lösen. An jedem Neutron haften höchstens zwei Protonen.
+  function screened(a, b, dx, dy, d2) {
+    for (const n of parts) {
+      if (n.type !== 'n') continue;
+      const t = ((n.x - a.x) * dx + (n.y - a.y) * dy) / d2;
+      if (t <= 0 || t >= 1) continue;
+      const perp = Math.abs((n.x - a.x) * dy - (n.y - a.y) * dx) / Math.sqrt(d2);
+      if (perp < 1.7 * R) return 0.12;
+    }
+    return 1;
+  }
+
+  function updateBonds(range) {
+    const alive = new Set(parts);
+    for (const n of parts) {
+      if (n.type !== 'n') continue;
+      n.bonds = (n.bonds || []).filter(p => alive.has(p) && Math.hypot(p.x - n.x, p.y - n.y) < range * 1.3);
+      if (n.bonds.length >= MAX_DOCK) continue;
+      const cand = parts
+        .filter(p => p.type === 'p' && !n.bonds.includes(p))
+        .map(p => [p, Math.hypot(p.x - n.x, p.y - n.y)])
+        .filter(([, d]) => d < range)
+        .sort((a, b) => a[1] - b[1]);
+      for (const [p] of cand) { if (n.bonds.length >= MAX_DOCK) break; n.bonds.push(p); }
+    }
+  }
+
+  // Punkte eines Sechseckgitters (Abstand 1), sortiert nach Entfernung vom Ursprung
+  const HEX = (() => {
+    const pts = [];
+    for (let i = -5; i <= 5; i++) for (let j = -5; j <= 5; j++) pts.push([i + j / 2, j * Math.sqrt(3) / 2]);
+    return pts.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
+  })();
+
+  // Gruppen von Teilchen, die über Berührungen aneinander haften
+  function clusters(lim) {
+    const idx = new Map(parts.map((p, i) => [p, i]));
+    const root = parts.map((_, i) => i);
+    const find = i => (root[i] === i ? i : (root[i] = find(root[i])));
+    for (const n of parts) {
+      if (n.type !== 'n') continue;
+      for (const o of parts) {
+        if (o === n || (o.type === 'p' && !n.bonds.includes(o))) continue;
+        if (Math.hypot(o.x - n.x, o.y - n.y) < lim) root[find(idx.get(n))] = find(idx.get(o));
+      }
+    }
+    const groups = new Map();
+    parts.forEach((p, i) => { const k = find(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); });
+    return [...groups.values()];
+  }
+
+  function step(dt) {
+    const A = 80 * R;              // Abstoßung bei Berührung
+    const ppRange = 6.5 * R;       // Reichweite der Abstoßung
+    const S = 60 * R;              // leichte Haftkraft bei Berührung
+    const touch = 2.25 * R;        // ab diesem Abstand gelten zwei Teilchen als berührend
+    updateBonds(touch);
+    for (const p of parts) { p.ax = 0; p.ay = 0; } // kein Zittern: ohne Berührung bleiben Teilchen liegen
+
+    for (let i = 0; i < parts.length; i++) {
+      const a = parts[i];
+      for (let j = i + 1; j < parts.length; j++) {
+        const b = parts[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 1e-6) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = dx * dx + dy * dy; }
+        const d = Math.sqrt(d2), ux = dx / d, uy = dy / d;
+        let f = 0; // positiv = abstoßend
+        if (a.type === 'p' && b.type === 'p') {
+          if (d < ppRange) {
+            const k = Math.min(1, 1 - (d - 2 * R) / (ppRange - 2 * R));
+            f = A * k * k * screened(a, b, dx, dy, d2);
+          }
+        } else if (d < touch) {
+          // Keine Anziehung oder Abstoßung auf Distanz – nur bei Berührung haften sie leicht.
+          const n = a.type === 'n' ? a : b, o = n === a ? b : a;
+          if (o.type === 'n' || n.bonds.includes(o)) f = -S;
+        }
+        a.ax -= ux * f; a.ay -= uy * f;
+        b.ax += ux * f; b.ay += uy * f;
+      }
+    }
+
+    // Haftende Teilchen rücken zu einer kompakten, runden Form zusammen,
+    // damit der entstandene Kern als solcher erkennbar ist.
+    for (const g of clusters(touch * 1.05)) {
+      if (g.length < 3) continue;
+      let gx = 0, gy = 0;
+      for (const p of g) { gx += p.x; gy += p.y; }
+      gx /= g.length; gy /= g.length;
+      // Zielplätze: dichteste Kugelpackung, nach Abstand zur Mitte sortiert – ergibt eine runde Form
+      const slots = HEX.slice(0, g.length).map(([u, v]) => [gx + u * 2 * R, gy + v * 2 * R]);
+      const free = slots.map(() => true);
+      g.sort((a, b) => Math.hypot(a.x - gx, a.y - gy) - Math.hypot(b.x - gx, b.y - gy));
+      for (const p of g) {
+        let best = -1, bd = Infinity;
+        slots.forEach(([sx, sy], i) => {
+          if (!free[i]) return;
+          const d = (sx - p.x) ** 2 + (sy - p.y) ** 2;
+          if (d < bd) { bd = d; best = i; }
+        });
+        free[best] = false;
+        let fx = (slots[best][0] - p.x) * 12, fy = (slots[best][1] - p.y) * 12;
+        const fl = Math.hypot(fx, fy), cap = 40 * R;
+        if (fl > cap) { fx *= cap / fl; fy *= cap / fl; }
+        p.ax += fx;
+        p.ay += fy;
+      }
+    }
+
+    const damp = Math.exp(-4 * dt), vmax = 24 * R;
+    for (const p of parts) {
+      p.vx = (p.vx + p.ax * dt) * damp;
+      p.vy = (p.vy + p.ay * dt) * damp;
+      const v = Math.hypot(p.vx, p.vy);
+      if (v > vmax) { p.vx *= vmax / v; p.vy *= vmax / v; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+
+    // Teilchen sind feste Kugeln: keine Überlappung
+    for (let it = 0; it < 4; it++) {
+      for (let i = 0; i < parts.length; i++) {
+        const a = parts[i];
+        for (let j = i + 1; j < parts.length; j++) {
+          const b = parts[j];
+          const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+          const min = 2 * R;
+          if (d < min && d > 1e-6) {
+            const ux = dx / d, uy = dy / d, o = (min - d) / 2;
+            a.x -= ux * o; a.y -= uy * o; b.x += ux * o; b.y += uy * o;
+            const rel = (b.vx - a.vx) * ux + (b.vy - a.vy) * uy;
+            if (rel < 0) { a.vx += ux * rel / 2; a.vy += uy * rel / 2; b.vx -= ux * rel / 2; b.vy -= uy * rel / 2; }
+          }
+        }
+        // Rand der Fläche
+        const ex = a.x - cx, ey = a.y - cy, ed = Math.hypot(ex, ey), lim = nucR - R;
+        if (ed > lim) {
+          const ux = ex / ed, uy = ey / ed;
+          a.x = cx + ux * lim; a.y = cy + uy * lim;
+          const vr = a.vx * ux + a.vy * uy;
+          if (vr > 0) { a.vx -= 1.3 * vr * ux; a.vy -= 1.3 * vr * uy; }
+        }
+      }
+    }
+  }
+
+  // ---------- Zeichnen ----------
+  function drawParticle(x, y, type) {
+    const g = ctx.createRadialGradient(x - R * 0.32, y - R * 0.4, R * 0.1, x, y, R);
+    if (type === 'p') {
+      g.addColorStop(0, mix(col.proton, '#ffffff', 0.45));
+      g.addColorStop(0.52, col.proton);
+      g.addColorStop(1, mix(col.proton, '#000000', 0.3));
+    } else {
+      g.addColorStop(0, mix(col.neutron, '#ffffff', 0.4));
+      g.addColorStop(0.58, col.neutron);
+      g.addColorStop(1, mix(col.neutron, '#000000', 0.28));
+    }
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.fillStyle = g; ctx.fill();
+    if (type === 'p') {
+      ctx.fillStyle = '#ffffff';
+      const l = R * 0.88, w = R * 0.22;
+      ctx.fillRect(x - l / 2, y - w / 2, l, w);
+      ctx.fillRect(x - w / 2, y - l / 2, w, l);
+    }
+  }
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    // Runde Experimentierfläche
+    ctx.beginPath(); ctx.arc(cx, cy, nucR, 0, Math.PI * 2);
+    ctx.fillStyle = col.nucleus; ctx.fill();
+    ctx.setLineDash([10, 8]); ctx.lineWidth = 3; ctx.strokeStyle = col['nucleus-line']; ctx.stroke();
+    ctx.setLineDash([]);
+    if (!parts.length) {
+      ctx.fillStyle = col.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `700 ${Math.round(R * 0.8)}px "Atkinson Hyperlegible", system-ui, sans-serif`;
+      ctx.fillText('Ziehe Protonen auf die Fläche', cx, cy);
+    }
+    ctx.fillStyle = col.shadow;
+    for (const p of parts) { ctx.beginPath(); ctx.ellipse(p.x + R * 0.12, p.y + R * 0.2, R, R, 0, 0, Math.PI * 2); ctx.fill(); }
+    for (const p of parts) if (p.type === 'n') drawParticle(p.x, p.y, 'n');
+    for (const p of parts) if (p.type === 'p') drawParticle(p.x, p.y, 'p');
+  }
+
+  function mix(c1, c2, t) {
+    const a = toRgb(c1), b = toRgb(c2);
+    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
+  }
+  function toRgb(c) {
+    if (c.startsWith('#')) {
+      const h = c.length === 4 ? c.slice(1).split('').map(x => x + x).join('') : c.slice(1, 7);
+      return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+    }
+    const m = c.match(/[\d.]+/g); return m ? m.slice(0, 3).map(Number) : [128, 128, 128];
+  }
+
+  // ---------- Materialkästen ----------
+  function buildTray(el, type, n) {
+    el.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement('div');
+      s.className = `particle slot ${type === 'p' ? 'proton' : 'neutron'}`;
+      s.dataset.type = type;
+      s.setAttribute('role', 'img');
+      s.setAttribute('aria-label', type === 'p' ? 'Proton' : 'Weiterer Kernbaustein');
+      s.addEventListener('pointerdown', e => {
+        if (s.classList.contains('used')) return;
+        e.preventDefault();
+        s.classList.add('used');
+        startDrag(e, type);
+      });
+      el.appendChild(s);
+    }
+  }
+  function returnToTray(type) {
+    const slot = document.querySelector(`#${type === 'p' ? 'protonSlots' : 'neutronSlots'} .slot.used`);
+    if (slot) slot.classList.remove('used');
+  }
+
+  // ---------- Drag & Drop (mehrere Finger gleichzeitig) ----------
+  const drags = new Map();
+  function startDrag(e, type) {
+    wake();
+    const g = document.createElement('div');
+    g.className = `particle ghost ${type === 'p' ? 'proton' : 'neutron'}`;
+    document.body.appendChild(g);
+    const d = { type, el: g };
+    drags.set(e.pointerId, d);
+    moveGhost(d, e.clientX, e.clientY);
+  }
+  function moveGhost(d, x, y) {
+    d.x = x; d.y = y;
+    d.el.style.transform = `translate(${x - R}px, ${y - R}px) scale(1.1)`;
+  }
+  canvas.addEventListener('pointerdown', e => {
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = -1, bd = (1.5 * R) ** 2;
+    parts.forEach((p, i) => { const d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < bd) { bd = d; best = i; } });
+    if (best < 0) return;
+    e.preventDefault();
+    const [p] = parts.splice(best, 1);
+    startDrag(e, p.type);
+  });
+  window.addEventListener('pointermove', e => {
+    const d = drags.get(e.pointerId); if (!d) return;
+    e.preventDefault(); moveGhost(d, e.clientX, e.clientY);
+  }, { passive: false });
+  function endDrag(e) {
+    const d = drags.get(e.pointerId); if (!d) return;
+    drags.delete(e.pointerId); d.el.remove();
+    const r = canvas.getBoundingClientRect();
+    let x = e.clientX - r.left, y = e.clientY - r.top;
+    const dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy);
+    if (e.type !== 'pointercancel' && dist < nucR + R * 0.4) {
+      const lim = nucR - R;
+      if (dist > lim) { x = cx + dx / dist * lim; y = cy + dy / dist * lim; }
+      parts.push({ type: d.type, x, y, vx: 0, vy: 0, ax: 0, ay: 0, bonds: [] });
+    } else {
+      returnToTray(d.type);
+    }
+  }
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  // ---------- Ablauf (die Person steuert mit „Weiter“) ----------
+  // Phasen: 'protons' → 'q1' → 'neutrons' → 'q2' → 'done' (Abschluss)
+  let phase = 'protons';
+  const steps = [...$('steps').children];
+  function setStep(n) {
+    steps.forEach((li, i) => {
+      li.classList.toggle('active', i === n - 1);
+      li.classList.toggle('done', i < n - 1);
+    });
+  }
+  const setTask = html => { $('taskText').innerHTML = html; };
+  const TASK_P = 'Ziehe die roten Protonen auf die Fläche. <strong>Versuche, die Protonen auf möglichst kleinem Raum zu platzieren.</strong>';
+  const TASK_N = 'Ziehe die weiteren Kernbausteine auf die Fläche. <strong>Versuche noch einmal, die Protonen auf möglichst kleinem Raum zu platzieren.</strong> Du kannst alle Teilchen auf der Fläche verschieben.';
+
+  function counts() {
+    let p = 0, n = 0;
+    for (const q of parts) q.type === 'p' ? p++ : n++;
+    return { p, n };
+  }
+
+  function updateControls() {
+    const c = counts();
+    $('pCount').textContent = c.p; $('nCount').textContent = c.n;
+    let ok = true, hint = '';
+    if (phase === 'protons' && c.p < 2) { ok = false; hint = 'Ziehe mindestens zwei Protonen auf die Fläche, dann geht es weiter.'; }
+    if (phase === 'neutrons' && c.n < 1) { ok = false; hint = 'Ziehe mindestens einen weiteren Kernbaustein auf die Fläche, dann geht es weiter.'; }
+    const btn = $('nextBtn');
+    if (btn.disabled === ok) btn.disabled = !ok;
+    if ($('hint').textContent !== hint) $('hint').textContent = hint;
+    $('hint').hidden = !hint;
+  }
+
+  $('nextBtn').addEventListener('click', () => {
+    if (phase === 'protons') {
+      phase = 'q1'; $('q1').hidden = false;
+    } else if (phase === 'q1') {
+      phase = 'neutrons';
+      $('q1').hidden = true;
+      const t = $('neutronTray'); t.hidden = false; t.classList.add('reveal');
+      $('nReadout').hidden = false;
+      setStep(2); setTask(TASK_N);
+    } else if (phase === 'neutrons') {
+      phase = 'q2'; $('q2').hidden = false;
+    } else if (phase === 'q2') {
+      phase = 'done';
+      $('nextBtn').hidden = true;
+      setStep(3);
+      $('overlay').hidden = false; $('closeBtn').focus();
+    }
+  });
+  $('closeBtn').addEventListener('click', () => { $('overlay').hidden = true; });
+  $('overlay').addEventListener('pointerdown', e => { if (e.target === $('overlay')) $('overlay').hidden = true; });
+
+  function reset() {
+    parts.length = 0;
+    for (const d of drags.values()) d.el.remove();
+    drags.clear();
+    buildTray($('protonSlots'), 'p', N_PROTONS);
+    buildTray($('neutronSlots'), 'n', N_NEUTRONS);
+    $('neutronTray').hidden = true; $('neutronTray').classList.remove('reveal');
+    $('nReadout').hidden = true;
+    $('q1').hidden = true; $('q2').hidden = true; $('overlay').hidden = true;
+    $('nextBtn').hidden = false;
+    phase = 'protons';
+    setStep(1); setTask(TASK_P);
+    updateControls();
+  }
+  $('resetBtn').addEventListener('click', reset);
+
+  // ---------- Vollbild & Bildschirm wach halten ----------
+  const fs = $('fsBtn');
+  if (document.fullscreenEnabled) {
+    fs.hidden = false;
+    fs.addEventListener('click', () => {
+      (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+    });
+    document.addEventListener('fullscreenchange', () => { fs.textContent = document.fullscreenElement ? 'Vollbild beenden' : 'Vollbild'; });
+  }
+  let lock = null;
+  function wake() {
+    if (lock || !navigator.wakeLock) return;
+    navigator.wakeLock.request('screen').then(l => { lock = l; l.addEventListener('release', () => { lock = null; }); }).catch(() => {});
+  }
+
+  // ---------- Schleife ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000); last = now;
+    const sub = 4;
+    for (let i = 0; i < sub; i++) step(dt / sub);
+    draw();
+    updateControls();
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  reset();
+  document.fonts && document.fonts.ready.then(readColors);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
